@@ -29,14 +29,60 @@ const Index = () => {
     simulateProcessing(file);
   };
 
+  const generateMockData = (): LotData[] => {
+    const data: LotData[] = [];
+    
+    // Gerar 140+ lotes residenciais
+    for (let i = 1; i <= 145; i++) {
+      data.push({
+        numero: i.toString().padStart(3, '0'),
+        area: Math.floor(Math.random() * (600 - 350) + 350), // Áreas entre 350 e 600 m²
+        tipo: 'lote'
+      });
+    }
+    
+    // Adicionar áreas públicas distribuídas
+    const areasPublicas = [
+      { numero: 'AP-01', area: 1250.0 },
+      { numero: 'AP-02', area: 890.5 },
+      { numero: 'AP-03', area: 2100.8 },
+      { numero: 'AP-04', area: 567.2 },
+      { numero: 'AP-05', area: 1456.7 },
+      { numero: 'AP-06', area: 734.9 },
+      { numero: 'AP-07', area: 1890.3 },
+      { numero: 'AP-08', area: 445.1 },
+      { numero: 'PRAÇA-01', area: 3200.5 },
+      { numero: 'PRAÇA-02', area: 2800.2 },
+      { numero: 'RESERVA-01', area: 5400.0 },
+      { numero: 'RESERVA-02', area: 4200.8 }
+    ];
+    
+    areasPublicas.forEach(ap => {
+      data.push({
+        numero: ap.numero,
+        area: ap.area,
+        tipo: 'area_publica'
+      });
+    });
+    
+    // Ordenar por número (lotes primeiro, depois áreas públicas)
+    return data.sort((a, b) => {
+      if (a.tipo === 'lote' && b.tipo === 'area_publica') return -1;
+      if (a.tipo === 'area_publica' && b.tipo === 'lote') return 1;
+      return a.numero.localeCompare(b.numero);
+    });
+  };
+
   const simulateProcessing = async (file: File) => {
     // Simulação do processamento para demonstração
     const steps = [
       { step: 'Validando arquivo...', duration: 500 },
-      { step: 'Analisando Master Plan...', duration: 2000 },
-      { step: 'Identificando lotes...', duration: 1500 },
-      { step: 'Extraindo áreas...', duration: 1000 },
-      { step: 'Gerando planilha...', duration: 800 },
+      { step: 'Analisando Master Plan com IA...', duration: 3000 },
+      { step: 'Identificando todos os lotes...', duration: 2500 },
+      { step: 'Extraindo áreas e numerações...', duration: 2000 },
+      { step: 'Associando áreas aos lotes...', duration: 1500 },
+      { step: 'Identificando áreas públicas...', duration: 1000 },
+      { step: 'Gerando planilha completa...', duration: 800 },
     ];
 
     let currentProgress = 0;
@@ -54,22 +100,9 @@ const Index = () => {
       }
     }
 
-    // Dados simulados para demonstração
-    const mockData: LotData[] = [
-      { numero: '01', area: 450.5, tipo: 'lote' },
-      { numero: '02', area: 523.8, tipo: 'lote' },
-      { numero: '03', area: 489.2, tipo: 'lote' },
-      { numero: '04', area: 612.1, tipo: 'lote' },
-      { numero: '05', area: 398.7, tipo: 'lote' },
-      { numero: 'AP-01', area: 1250.0, tipo: 'area_publica' },
-      { numero: '06', area: 445.3, tipo: 'lote' },
-      { numero: '07', area: 534.9, tipo: 'lote' },
-      { numero: '08', area: 467.2, tipo: 'lote' },
-      { numero: 'AP-02', area: 890.5, tipo: 'area_publica' },
-      { numero: '09', area: 511.8, tipo: 'lote' },
-      { numero: '10', area: 478.6, tipo: 'lote' },
-    ];
-
+    // Gerar dados simulados completos
+    const mockData = generateMockData();
+    
     setExtractedData(mockData);
     setState('results');
     
