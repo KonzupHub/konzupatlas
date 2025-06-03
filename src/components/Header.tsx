@@ -17,9 +17,6 @@ const Header = () => {
               <p className="text-sm text-gray-600">Automatização de Master Plans</p>
             </div>
           </div>
-          <div className="text-right">
-            <span className="text-sm text-gray-500">v1.0</span>
-          </div>
         </div>
       </div>
     </header>

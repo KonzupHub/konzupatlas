@@ -199,7 +199,19 @@ const Index = () => {
       
       <footer className="bg-white border-t border-gray-200 py-8 mt-16">
         <div className="container mx-auto px-6 text-center text-gray-600">
-          <p>&copy; 2024 Konzup Atlas. Automatização inteligente para construtoras.</p>
+          <p>
+            &copy; 2025 Konzup Atlas. Automatização inteligente para construtoras. 
+            Desenvolvido por{' '}
+            <a 
+              href="https://konzup.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-konzup-600 hover:text-konzup-700 font-medium underline"
+            >
+              Konzup
+            </a>
+            .
+          </p>
         </div>
       </footer>
     </div>
