@@ -166,7 +166,7 @@ const Index = () => {
             
             <PDFUploader 
               onFileSelect={handleFileSelect} 
-              isProcessing={state === 'processing'}
+              isProcessing={false}
             />
             
             <div className="text-center text-sm text-gray-500 space-y-2">
