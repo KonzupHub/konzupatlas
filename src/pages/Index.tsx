@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import Header from '@/components/Header';
 import PDFUploader from '@/components/PDFUploader';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import ResultsTable from '@/components/ResultsTable';
 import { useToast } from '@/hooks/use-toast';
-import { useFileCleanup } from '@/hooks/useFileCleanup';
+import { usePDFProcessing } from '@/hooks/usePDFProcessing';
 
 interface LotData {
   numero: string;
@@ -17,104 +18,23 @@ type AppState = 'upload' | 'processing' | 'results';
 const Index = () => {
   const [state, setState] = useState<AppState>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState('');
   const [extractedData, setExtractedData] = useState<LotData[]>([]);
   const { toast } = useToast();
-  const { scheduleCleanup } = useFileCleanup();
+  const { processFile, isProcessing, progress, currentStep } = usePDFProcessing();
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     console.log('Arquivo selecionado:', file.name, file.size);
     setSelectedFile(file);
     setState('processing');
-    simulateProcessing(file);
-  };
 
-  const generateMockData = (): LotData[] => {
-    const data: LotData[] = [];
-    
-    // Gerar 140+ lotes residenciais
-    for (let i = 1; i <= 145; i++) {
-      data.push({
-        numero: i.toString().padStart(3, '0'),
-        area: Math.floor(Math.random() * (600 - 350) + 350), // Áreas entre 350 e 600 m²
-        tipo: 'lote'
-      });
+    try {
+      const data = await processFile(file);
+      setExtractedData(data);
+      setState('results');
+    } catch (error) {
+      setState('upload');
+      setSelectedFile(null);
     }
-    
-    // Adicionar áreas públicas distribuídas
-    const areasPublicas = [
-      { numero: 'AP-01', area: 1250.0 },
-      { numero: 'AP-02', area: 890.5 },
-      { numero: 'AP-03', area: 2100.8 },
-      { numero: 'AP-04', area: 567.2 },
-      { numero: 'AP-05', area: 1456.7 },
-      { numero: 'AP-06', area: 734.9 },
-      { numero: 'AP-07', area: 1890.3 },
-      { numero: 'AP-08', area: 445.1 },
-      { numero: 'PRAÇA-01', area: 3200.5 },
-      { numero: 'PRAÇA-02', area: 2800.2 },
-      { numero: 'RESERVA-01', area: 5400.0 },
-      { numero: 'RESERVA-02', area: 4200.8 }
-    ];
-    
-    areasPublicas.forEach(ap => {
-      data.push({
-        numero: ap.numero,
-        area: ap.area,
-        tipo: 'area_publica'
-      });
-    });
-    
-    // Ordenar por número (lotes primeiro, depois áreas públicas)
-    return data.sort((a, b) => {
-      if (a.tipo === 'lote' && b.tipo === 'area_publica') return -1;
-      if (a.tipo === 'area_publica' && b.tipo === 'lote') return 1;
-      return a.numero.localeCompare(b.numero);
-    });
-  };
-
-  const simulateProcessing = async (file: File) => {
-    // Simulação do processamento para demonstração
-    const steps = [
-      { step: 'Validando arquivo...', duration: 500 },
-      { step: 'Analisando Master Plan com IA...', duration: 3000 },
-      { step: 'Identificando todos os lotes...', duration: 2500 },
-      { step: 'Extraindo áreas e numerações...', duration: 2000 },
-      { step: 'Associando áreas aos lotes...', duration: 1500 },
-      { step: 'Identificando áreas públicas...', duration: 1000 },
-      { step: 'Gerando planilha completa...', duration: 500 },
-      { step: 'Limpando arquivos temporários...', duration: 300 },
-    ];
-
-    let currentProgress = 0;
-    
-    for (let i = 0; i < steps.length; i++) {
-      setCurrentStep(steps[i].step);
-      const targetProgress = ((i + 1) / steps.length) * 100;
-      
-      // Animação suave do progresso
-      const progressStep = (targetProgress - currentProgress) / 20;
-      for (let j = 0; j < 20; j++) {
-        currentProgress += progressStep;
-        setProgress(Math.min(currentProgress, targetProgress));
-        await new Promise(resolve => setTimeout(resolve, steps[i].duration / 20));
-      }
-    }
-
-    // Gerar dados simulados completos
-    const mockData = generateMockData();
-    
-    setExtractedData(mockData);
-    setState('results');
-    
-    // Agendar limpeza do arquivo após sucesso
-    scheduleCleanup(file);
-    
-    toast({
-      title: "Processamento concluído!",
-      description: `${mockData.length} itens extraídos. Arquivo temporário será removido automaticamente.`,
-    });
   };
 
   const handleDownloadExcel = () => {
@@ -147,8 +67,6 @@ const Index = () => {
   const handleNewUpload = () => {
     setState('upload');
     setSelectedFile(null);
-    setProgress(0);
-    setCurrentStep('');
     setExtractedData([]);
   };
 
@@ -165,20 +83,21 @@ const Index = () => {
               </h2>
               <p className="text-xl text-gray-600 max-w-2xl mx-auto">
                 Transforme mapas de loteamentos em planilhas organizadas em segundos. 
-                Precisão garantida, trabalho manual eliminado.
+                Precisão garantida com IA, trabalho manual eliminado.
               </p>
             </div>
             
             <PDFUploader 
               onFileSelect={handleFileSelect} 
-              isProcessing={false}
+              isProcessing={isProcessing}
             />
             
             <div className="text-center text-sm text-gray-500 space-y-2">
               <p>✅ Suporte a PDFs de até 20MB</p>
-              <p>🎯 IA especializada em Master Plans</p>
+              <p>🤖 IA GPT-4 especializada em Master Plans</p>
               <p>📊 Export direto para Excel e CSV</p>
               <p>🔒 Seus arquivos são processados com segurança</p>
+              <p>🗑️ Arquivos temporários removidos automaticamente</p>
             </div>
           </div>
         )}

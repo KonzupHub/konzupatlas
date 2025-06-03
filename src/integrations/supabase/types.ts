@@ -9,7 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      pdf_processing_history: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          file_name: string
+          file_size: number
+          id: string
+          processing_duration_seconds: number | null
+          processing_status: string
+          total_items_extracted: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name: string
+          file_size: number
+          id?: string
+          processing_duration_seconds?: number | null
+          processing_status?: string
+          total_items_extracted?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name?: string
+          file_size?: number
+          id?: string
+          processing_duration_seconds?: number | null
+          processing_status?: string
+          total_items_extracted?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
