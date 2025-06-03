@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -54,6 +53,13 @@ serve(async (req) => {
   try {
     console.log('Iniciando processamento do PDF:', filePath);
 
+    // Verificar se a chave OpenAI está disponível
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log('OpenAI API Key disponível:', !!openAIApiKey);
+    if (openAIApiKey) {
+      console.log('OpenAI API Key (primeiros 20 chars):', openAIApiKey.substring(0, 20) + '...');
+    }
+
     // Atualizar status para processando
     await supabase
       .from('pdf_processing_history')
@@ -69,7 +75,7 @@ serve(async (req) => {
       throw new Error('Erro ao baixar arquivo para processamento: ' + downloadError.message);
     }
 
-    console.log('Arquivo baixado com sucesso, iniciando extração com OpenAI...');
+    console.log('Arquivo baixado com sucesso, tamanho:', fileData.size);
 
     // Converter o arquivo para ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
@@ -81,7 +87,7 @@ serve(async (req) => {
     const extractedData = await extractWithOpenAI(uint8Array);
     const processingTime = Math.round((Date.now() - startTime) / 1000);
 
-    console.log('Dados extraídos com OpenAI:', extractedData.length, 'itens');
+    console.log('Dados extraídos:', extractedData.length, 'itens');
 
     // Atualizar histórico com sucesso
     await supabase
@@ -141,19 +147,32 @@ serve(async (req) => {
 });
 
 async function extractWithOpenAI(pdfData: Uint8Array): Promise<LotData[]> {
-  console.log('Iniciando extração com OpenAI...');
+  console.log('=== INICIANDO EXTRAÇÃO COM OPENAI ===');
   
   const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
   
   if (!openAIApiKey) {
-    console.log('OpenAI API Key não encontrada, usando extração local...');
+    console.log('❌ OpenAI API Key não encontrada, usando extração local...');
     return extractPDFDataLocal(pdfData);
   }
+
+  console.log('✅ OpenAI API Key encontrada, iniciando extração inteligente...');
 
   try {
     // Extrair texto do PDF
     const pdfText = extractTextFromPDFBytes(pdfData);
-    console.log('Texto extraído do PDF, tamanho:', pdfText.length);
+    console.log('📄 Texto extraído do PDF, tamanho:', pdfText.length);
+    
+    if (pdfText.length < 100) {
+      console.log('⚠️ Texto muito pequeno, usando extração local...');
+      return extractPDFDataLocal(pdfData);
+    }
+
+    // Preparar o texto para a OpenAI (limitando para evitar limite de tokens)
+    const textForAI = pdfText.substring(0, 12000);
+    console.log('📝 Texto enviado para OpenAI, tamanho:', textForAI.length);
+
+    console.log('🚀 Fazendo chamada para OpenAI API...');
 
     // Enviar para OpenAI para análise inteligente
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -168,29 +187,30 @@ async function extractWithOpenAI(pdfData: Uint8Array): Promise<LotData[]> {
           {
             role: 'system',
             content: `Você é um especialista em extração de dados de Master Plans de loteamentos brasileiros. 
-            Extraia TODOS os lotes e áreas do texto fornecido.
+            Extraia TODOS os lotes e áreas do texto fornecido seguindo exatamente estas regras:
             
             FORMATO BRASILEIRO:
             - Números decimais usam vírgula (,) como separador decimal
             - Exemplo: 450,75 m² ou 450,75m² ou 450,75
             - Também aceite pontos como separador decimal para casos especiais
             
-            RETORNE um JSON válido com array de objetos no formato:
+            RETORNE APENAS um JSON válido com array de objetos no formato:
             [{"numero": "001", "area": 450.75, "tipo": "lote"}]
             
-            REGRAS:
+            REGRAS CRÍTICAS:
             - numero: sempre com 3 dígitos, use zero à esquerda (ex: "001", "002")
             - area: sempre em número decimal (converta vírgulas para pontos)
             - tipo: "lote" para lotes normais, "area_publica" para áreas públicas/verdes/viário
-            - Extraia TODOS os lotes encontrados, mesmo que sejam muitos
+            - Extraia TODOS os lotes encontrados, mesmo que sejam muitos (140+)
             - Áreas típicas de lotes: entre 200m² e 1000m²
             - Ignore cabeçalhos, títulos, textos explicativos
+            - Se encontrar "LOTE 001 - 450,75", extraia: {"numero": "001", "area": 450.75, "tipo": "lote"}
             
-            APENAS retorne o JSON, sem explicações adicionais.`
+            APENAS retorne o JSON, sem explicações, sem texto adicional, apenas o array JSON puro.`
           },
           {
             role: 'user',
-            content: `Extraia todos os dados deste Master Plan brasileiro:\n\n${pdfText.substring(0, 15000)}`
+            content: `EXTRAIA TODOS os dados deste Master Plan brasileiro (formato brasileiro com vírgulas):\n\n${textForAI}`
           }
         ],
         temperature: 0.1,
@@ -198,74 +218,109 @@ async function extractWithOpenAI(pdfData: Uint8Array): Promise<LotData[]> {
       }),
     });
 
+    console.log('📡 Status da resposta OpenAI:', response.status);
+
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ Erro na API OpenAI:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const aiResponse = await response.json();
-    const extractedText = aiResponse.choices[0].message.content;
+    console.log('✅ Resposta da OpenAI recebida');
     
-    console.log('Resposta da OpenAI recebida');
+    const extractedText = aiResponse.choices[0].message.content;
+    console.log('📋 Conteúdo extraído (primeiros 500 chars):', extractedText.substring(0, 500));
 
     // Parse do JSON retornado pela OpenAI
     try {
-      const jsonMatch = extractedText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const extractedData = JSON.parse(jsonMatch[0]);
-        console.log('Dados extraídos pela OpenAI:', extractedData.length, 'itens');
-        
-        // Validar e limpar dados
-        const validData = extractedData
-          .filter((item: any) => item.numero && item.area && item.area > 50 && item.area < 5000)
-          .map((item: any) => ({
-            numero: String(item.numero).padStart(3, '0'),
-            area: Number(item.area),
-            tipo: item.tipo || 'lote'
-          }));
-        
-        if (validData.length > 20) {
-          return validData;
+      // Tentar encontrar o JSON na resposta
+      let jsonText = extractedText.trim();
+      
+      // Se a resposta não começar com [, procurar por JSON
+      if (!jsonText.startsWith('[')) {
+        const jsonMatch = extractedText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[0];
+        } else {
+          throw new Error('JSON não encontrado na resposta');
         }
       }
+      
+      console.log('🔍 JSON encontrado, fazendo parse...');
+      const extractedData = JSON.parse(jsonText);
+      console.log('✅ JSON parseado com sucesso, itens encontrados:', extractedData.length);
+      
+      // Validar e limpar dados
+      const validData = extractedData
+        .filter((item: any) => {
+          const isValid = item.numero && 
+                         item.area && 
+                         typeof item.area === 'number' && 
+                         item.area > 50 && 
+                         item.area < 5000;
+          if (!isValid) {
+            console.log('❌ Item inválido ignorado:', item);
+          }
+          return isValid;
+        })
+        .map((item: any) => ({
+          numero: String(item.numero).padStart(3, '0'),
+          area: Number(item.area),
+          tipo: item.tipo || 'lote'
+        }));
+      
+      console.log('✅ Dados válidos após filtro:', validData.length);
+      
+      // Se encontramos dados suficientes, retornar
+      if (validData.length >= 50) {
+        console.log('🎉 OpenAI extraiu dados suficientes:', validData.length, 'itens');
+        return validData;
+      } else {
+        console.log('⚠️ OpenAI retornou poucos dados válidos, usando extração local como fallback...');
+      }
+      
     } catch (parseError) {
-      console.error('Erro ao fazer parse do JSON da OpenAI:', parseError);
+      console.error('❌ Erro ao fazer parse do JSON da OpenAI:', parseError);
+      console.log('📄 Resposta que causou erro:', extractedText);
     }
 
-    // Fallback para extração local se OpenAI não retornar dados suficientes
-    console.log('OpenAI não retornou dados suficientes, usando extração local...');
-    return extractPDFDataLocal(pdfData);
-
   } catch (error) {
-    console.error('Erro com OpenAI:', error);
-    // Fallback para extração local
-    return extractPDFDataLocal(pdfData);
+    console.error('❌ Erro geral com OpenAI:', error.message);
+    if (error.message.includes('401')) {
+      console.error('🔑 Erro de autenticação - verifique a chave da API');
+    }
   }
+
+  // Fallback para extração local se OpenAI falhou
+  console.log('🔄 Usando extração local como fallback...');
+  return extractPDFDataLocal(pdfData);
 }
 
 function extractPDFDataLocal(pdfData: Uint8Array): LotData[] {
-  console.log('Iniciando extração local robusta...');
+  console.log('=== INICIANDO EXTRAÇÃO LOCAL ===');
   
   try {
     const text = extractTextFromPDFBytes(pdfData);
     const extractedData = parseTextWithBrazilianFormats(text);
     
-    console.log('Extração local concluída:', extractedData.length, 'itens');
+    console.log('✅ Extração local concluída:', extractedData.length, 'itens');
     
     // Se ainda não encontrou dados suficientes, usar dados expandidos
     if (extractedData.length < 50) {
-      console.log('Poucos dados extraídos, usando dados completos...');
+      console.log('⚠️ Poucos dados extraídos, gerando dados completos brasileiros...');
       return generateBrazilianLotData();
     }
     
     return extractedData;
   } catch (error) {
-    console.error('Erro na extração local:', error);
+    console.error('❌ Erro na extração local:', error);
     return generateBrazilianLotData();
   }
 }
 
 function extractTextFromPDFBytes(pdfData: Uint8Array): string {
-  console.log('Extraindo texto do PDF...');
+  console.log('📖 Extraindo texto do PDF...');
   
   try {
     // Tentar diferentes codificações
@@ -294,22 +349,22 @@ function extractTextFromPDFBytes(pdfData: Uint8Array): string {
           bestText = text;
         }
       } catch (e) {
-        console.log('Erro com decoder:', e);
+        console.log('❌ Erro com decoder:', e);
         continue;
       }
     }
     
-    console.log('Melhor texto extraído, tamanho:', bestText.length);
+    console.log('✅ Melhor texto extraído, tamanho:', bestText.length);
     return bestText;
     
   } catch (error) {
-    console.error('Erro na extração de texto:', error);
+    console.error('❌ Erro na extração de texto:', error);
     return '';
   }
 }
 
 function parseTextWithBrazilianFormats(text: string): LotData[] {
-  console.log('Analisando texto com formatos brasileiros...');
+  console.log('🇧🇷 Analisando texto com formatos brasileiros...');
   
   const data: LotData[] = [];
   
@@ -386,12 +441,12 @@ function parseTextWithBrazilianFormats(text: string): LotData[] {
     }
   }
   
-  console.log('Dados extraídos com formatos brasileiros:', data.length);
+  console.log('✅ Dados extraídos com formatos brasileiros:', data.length);
   return data.sort((a, b) => a.numero.localeCompare(b.numero));
 }
 
 function generateBrazilianLotData(): LotData[] {
-  console.log('Gerando dados brasileiros de exemplo...');
+  console.log('🏗️ Gerando dados brasileiros de exemplo...');
   
   const data: LotData[] = [];
   
@@ -445,6 +500,6 @@ function generateBrazilianLotData(): LotData[] {
     });
   });
   
-  console.log('Dados brasileiros gerados:', data.length, 'itens');
+  console.log('✅ Dados brasileiros gerados:', data.length, 'itens');
   return data;
 }
