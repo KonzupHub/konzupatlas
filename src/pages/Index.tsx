@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import PDFUploader from '@/components/PDFUploader';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import ResultsTable from '@/components/ResultsTable';
+import UploadFeatures from '@/components/upload/UploadFeatures';
 import { useToast } from '@/hooks/use-toast';
 import { usePDFProcessing } from '@/hooks/usePDFProcessing';
 
@@ -92,13 +93,7 @@ const Index = () => {
               isProcessing={isProcessing}
             />
             
-            <div className="text-center text-sm text-gray-500 space-y-2">
-              <p>✅ Suporte a PDFs de até 20MB</p>
-              <p>🤖 IA GPT-4 especializada em Master Plans</p>
-              <p>📊 Export direto para Excel e CSV</p>
-              <p>🔒 Seus arquivos são processados com segurança</p>
-              <p>🗑️ Arquivos temporários removidos automaticamente</p>
-            </div>
+            <UploadFeatures />
           </div>
         )}
         
