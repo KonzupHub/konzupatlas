@@ -8,6 +8,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Função para sanitizar o nome do arquivo
+function sanitizeFileName(fileName: string): string {
+  return fileName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-zA-Z0-9.-]/g, '_') // Substitui caracteres especiais por underscore
+    .replace(/_+/g, '_') // Remove underscores múltiplos
+    .replace(/^_|_$/g, ''); // Remove underscores no início e fim
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -32,8 +42,13 @@ serve(async (req) => {
 
     console.log('Fazendo upload do arquivo:', file.name, 'Tamanho:', file.size);
 
+    // Sanitizar o nome do arquivo antes do upload
+    const sanitizedFileName = sanitizeFileName(file.name);
+    const fileName = `temp/${Date.now()}_${sanitizedFileName}`;
+    
+    console.log('Nome do arquivo sanitizado:', fileName);
+
     // Upload para storage temporário
-    const fileName = `temp/${Date.now()}_${file.name}`;
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('pdf-uploads')
       .upload(fileName, file);
@@ -47,7 +62,7 @@ serve(async (req) => {
     const { data: historyData, error: historyError } = await supabase
       .from('pdf_processing_history')
       .insert({
-        file_name: file.name,
+        file_name: file.name, // Mantém o nome original no histórico
         file_size: file.size,
         processing_status: 'uploaded'
       })
