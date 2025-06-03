@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import Header from '@/components/Header';
 import PDFUploader from '@/components/PDFUploader';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import ResultsTable from '@/components/ResultsTable';
 import { useToast } from '@/hooks/use-toast';
+import { useFileCleanup } from '@/hooks/useFileCleanup';
 
 interface LotData {
   numero: string;
@@ -21,6 +21,7 @@ const Index = () => {
   const [currentStep, setCurrentStep] = useState('');
   const [extractedData, setExtractedData] = useState<LotData[]>([]);
   const { toast } = useToast();
+  const { scheduleCleanup } = useFileCleanup();
 
   const handleFileSelect = (file: File) => {
     console.log('Arquivo selecionado:', file.name, file.size);
@@ -82,7 +83,8 @@ const Index = () => {
       { step: 'Extraindo áreas e numerações...', duration: 2000 },
       { step: 'Associando áreas aos lotes...', duration: 1500 },
       { step: 'Identificando áreas públicas...', duration: 1000 },
-      { step: 'Gerando planilha completa...', duration: 800 },
+      { step: 'Gerando planilha completa...', duration: 500 },
+      { step: 'Limpando arquivos temporários...', duration: 300 },
     ];
 
     let currentProgress = 0;
@@ -106,9 +108,12 @@ const Index = () => {
     setExtractedData(mockData);
     setState('results');
     
+    // Agendar limpeza do arquivo após sucesso
+    scheduleCleanup(file);
+    
     toast({
       title: "Processamento concluído!",
-      description: `${mockData.length} itens extraídos com sucesso do arquivo ${file.name}`,
+      description: `${mockData.length} itens extraídos. Arquivo temporário será removido automaticamente.`,
     });
   };
 
