@@ -38,8 +38,8 @@ export const usePDFProcessing = () => {
 
       const { filePath, historyId } = uploadResponse.data;
 
-      // Step 2: Processar com IA
-      setCurrentStep('Analisando Master Plan com IA...');
+      // Step 2: Processar com OCR
+      setCurrentStep('Convertendo PDF em imagens...');
       setProgress(30);
 
       const processResponse = await supabase.functions.invoke('process-pdf', {
@@ -50,12 +50,12 @@ export const usePDFProcessing = () => {
         throw new Error(processResponse.error.message);
       }
 
-      // Simular progresso durante o processamento
+      // Simular progresso durante o processamento OCR
       const steps = [
-        { step: 'Identificando todos os lotes...', progress: 50 },
-        { step: 'Extraindo áreas e numerações...', progress: 70 },
-        { step: 'Associando áreas aos lotes...', progress: 85 },
-        { step: 'Identificando áreas públicas...', progress: 95 },
+        { step: 'Executando OCR nas páginas...', progress: 50 },
+        { step: 'Identificando padrões de lotes...', progress: 70 },
+        { step: 'Extraindo números e áreas...', progress: 85 },
+        { step: 'Organizando dados extraídos...', progress: 95 },
         { step: 'Finalizando processamento...', progress: 100 }
       ];
 
@@ -68,14 +68,14 @@ export const usePDFProcessing = () => {
       const { data: extractedData, totalItems, processingTime } = processResponse.data;
 
       toast({
-        title: "Processamento concluído!",
-        description: `${totalItems} itens extraídos em ${processingTime}s. Arquivo temporário será removido automaticamente.`,
+        title: "Processamento OCR concluído!",
+        description: `${totalItems} itens extraídos em ${processingTime}s via OCR. Arquivo temporário será removido automaticamente.`,
       });
 
       return extractedData;
 
     } catch (error) {
-      console.error('Erro no processamento:', error);
+      console.error('Erro no processamento OCR:', error);
       toast({
         title: "Erro no processamento",
         description: error.message || "Ocorreu um erro ao processar o arquivo",

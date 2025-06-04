@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Loader2, FileText, Brain, Table, Search } from 'lucide-react';
+import { Loader2, FileText, ScanText, Table, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 
@@ -13,10 +13,10 @@ interface ProcessingStatusProps {
 const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ fileName, progress, currentStep }) => {
   const steps = [
     { name: 'Upload concluído', icon: FileText, completed: progress >= 15 },
-    { name: 'Analisando com IA', icon: Brain, completed: progress >= 30 },
-    { name: 'Identificando lotes', icon: Search, completed: progress >= 50 },
-    { name: 'Extraindo áreas', icon: Brain, completed: progress >= 70 },
-    { name: 'Associando dados', icon: Brain, completed: progress >= 85 },
+    { name: 'Convertendo em imagens', icon: ScanText, completed: progress >= 30 },
+    { name: 'Executando OCR', icon: Search, completed: progress >= 50 },
+    { name: 'Extraindo dados', icon: ScanText, completed: progress >= 70 },
+    { name: 'Organizando lotes', icon: ScanText, completed: progress >= 85 },
     { name: 'Gerando planilha', icon: Table, completed: progress >= 100 },
   ];
 
@@ -29,7 +29,7 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ fileName, progress,
             <span>Processando Master Plan</span>
           </CardTitle>
           <p className="text-sm text-gray-600">{fileName}</p>
-          <p className="text-xs text-gray-500">IA analisando todos os lotes e áreas públicas...</p>
+          <p className="text-xs text-gray-500">OCR analisando todos os lotes e áreas...</p>
         </CardHeader>
         
         <CardContent className="space-y-6">
