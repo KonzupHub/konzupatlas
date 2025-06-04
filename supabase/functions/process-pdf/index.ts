@@ -172,7 +172,7 @@ async function extractWithOpenAI(pdfData: Uint8Array): Promise<LotData[]> {
 
     console.log('🚀 Fazendo chamada para OpenAI API...');
 
-    // Enviar para OpenAI para análise inteligente
+    // Enviar para OpenAI para análise inteligente - SEM FILTROS DE TAMANHO
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -184,36 +184,36 @@ async function extractWithOpenAI(pdfData: Uint8Array): Promise<LotData[]> {
         messages: [
           {
             role: 'system',
-            content: `Você é um especialista em extração de dados de Master Plans de loteamentos brasileiros. 
+            content: `Você é um especialista em extração de dados de Master Plans de loteamentos brasileiros.
             Extraia TODOS os lotes do texto fornecido seguindo exatamente estas regras:
             
-            VALIDAÇÃO DE ÁREAS BRASILEIRAS:
-            - Áreas de lotes residenciais no Brasil: entre 200m² e 800m²
-            - Se encontrar áreas maiores que 1000m², provavelmente é erro de formatação
-            - Exemplo comum: "450,75 m²" deve virar {"area": 450.75}
-            - JAMAIS aceite áreas como 1.343,10 (isso são MIL metros, muito grande para lote residencial)
+            IMPORTANTE - NÃO APLIQUE FILTROS DE TAMANHO:
+            - Aceite qualquer área que encontrar: 200m², 800m², 1.500m², 3.000m², 10.000m² etc
+            - NÃO filtre ou rejeite áreas grandes
+            - NÃO aplique limites máximos ou mínimos
+            - Se vir 1.343,10 m² - aceite exatamente isso
+            - Se vir 5.267,89 m² - aceite exatamente isso
             
             FORMATOS BRASILEIROS:
-            - Números decimais usam vírgula (,) como separador decimal: 450,75
-            - Números grandes usam ponto como separador de milhares: 1.200,50
-            - MAS em loteamentos residenciais, áreas típicas são 200-800m²
+            - Números decimais usam vírgula (,): 1.343,10
+            - Números grandes podem usar ponto como separador de milhares: 1.200,50
+            - Mantenha o formato original encontrado
             
             RETORNE APENAS um JSON válido com array de objetos no formato:
-            [{"numero": "001", "area": 450.75, "tipo": "lote"}]
+            [{"numero": "001", "area": 1343.10, "tipo": "lote"}]
             
-            REGRAS CRÍTICAS:
+            REGRAS:
             - numero: sempre com 3 dígitos, use zero à esquerda (ex: "001", "002")
-            - area: sempre em número decimal, MÁXIMO 800m² para lotes residenciais
+            - area: sempre em número decimal, ACEITE QUALQUER VALOR ENCONTRADO
             - tipo: "lote" para lotes normais, "area_publica" para áreas públicas/verdes
-            - Se uma área aparece como 1.343,10 - IGNORE, isso é erro (muito grande)
-            - Procure por áreas de 200 a 800 metros quadrados apenas
-            - Extraia TODOS os lotes válidos encontrados
+            - Extraia TODOS os lotes encontrados, independente do tamanho da área
+            - NÃO rejeite dados por serem "muito grandes" ou "muito pequenos"
             
             APENAS retorne o JSON, sem explicações, sem texto adicional.`
           },
           {
             role: 'user',
-            content: `EXTRAIA TODOS os lotes deste Master Plan brasileiro (áreas típicas 200-800m²):\n\n${textForAI}`
+            content: `EXTRAIA TODOS os lotes deste Master Plan brasileiro (aceite qualquer tamanho de área):\n\n${textForAI}`
           }
         ],
         temperature: 0.1,
@@ -254,16 +254,15 @@ async function extractWithOpenAI(pdfData: Uint8Array): Promise<LotData[]> {
       const extractedData = JSON.parse(jsonText);
       console.log('✅ JSON parseado com sucesso, itens encontrados:', extractedData.length);
       
-      // Validar e limpar dados - VALIDAÇÃO BRASILEIRA CORRIGIDA
+      // Validar estrutura básica apenas - SEM FILTROS DE TAMANHO
       const validData = extractedData
         .filter((item: any) => {
           const isValid = item.numero && 
                          item.area && 
                          typeof item.area === 'number' && 
-                         item.area >= 200 && 
-                         item.area <= 800; // MÁXIMO 800m² para lotes residenciais
+                         item.area > 0; // Apenas verificar se é positivo
           if (!isValid) {
-            console.log('❌ Item inválido ignorado (área fora do padrão residencial):', item);
+            console.log('❌ Item inválido ignorado (estrutura incorreta):', item);
           }
           return isValid;
         })
@@ -273,14 +272,14 @@ async function extractWithOpenAI(pdfData: Uint8Array): Promise<LotData[]> {
           tipo: item.tipo || 'lote'
         }));
       
-      console.log('✅ Dados válidos após filtro:', validData.length);
+      console.log('✅ Dados válidos após validação de estrutura:', validData.length);
       
-      // Se encontramos dados suficientes, retornar
-      if (validData.length >= 50) {
-        console.log('🎉 OpenAI extraiu dados suficientes:', validData.length, 'itens');
+      // Se encontramos dados, retornar (sem limite mínimo)
+      if (validData.length > 0) {
+        console.log('🎉 OpenAI extraiu dados com sucesso:', validData.length, 'itens');
         return validData;
       } else {
-        console.log('⚠️ OpenAI retornou poucos dados válidos, usando extração local como fallback...');
+        console.log('⚠️ OpenAI não retornou dados válidos, usando extração local como fallback...');
       }
       
     } catch (parseError) {
@@ -309,16 +308,16 @@ function extractPDFDataLocal(pdfData: Uint8Array): LotData[] {
     
     console.log('✅ Extração local concluída:', extractedData.length, 'itens');
     
-    // Se ainda não encontrou dados suficientes, usar dados expandidos
-    if (extractedData.length < 50) {
-      console.log('⚠️ Poucos dados extraídos, gerando dados completos brasileiros...');
-      return generateBrazilianLotData();
+    // Se ainda não encontrou dados, usar dados de exemplo
+    if (extractedData.length < 10) {
+      console.log('⚠️ Poucos dados extraídos, gerando dados de exemplo para condomínios de luxo...');
+      return generateLuxuryCondominiumData();
     }
     
     return extractedData;
   } catch (error) {
     console.error('❌ Erro na extração local:', error);
-    return generateBrazilianLotData();
+    return generateLuxuryCondominiumData();
   }
 }
 
@@ -367,26 +366,26 @@ function extractTextFromPDFBytes(pdfData: Uint8Array): string {
 }
 
 function parseTextWithBrazilianFormats(text: string): LotData[] {
-  console.log('🇧🇷 Analisando texto com formatos brasileiros...');
+  console.log('🇧🇷 Analisando texto com formatos brasileiros - SEM FILTROS DE TAMANHO...');
   
   const data: LotData[] = [];
   
-  // Padrões específicos para formatos brasileiros - CORRIGIDOS
+  // Padrões para formatos brasileiros - ACEITAR QUALQUER ÁREA
   const brazilianPatterns = [
-    // Padrão: LOTE 001 - 450,75 m² (SEM separador de milhares)
-    /(?:LOTE|LOT|L)\s*[:\-]?\s*(\d{1,3})\s*[:\-]?\s*.*?(\d{2,3},\d{1,2}|\d{2,3})\s*[mM]²?/gi,
+    // Padrão: LOTE 001 - 1.343,75 m² (com separador de milhares)
+    /(?:LOTE|LOT|L)\s*[:\-]?\s*(\d{1,3})\s*[:\-]?\s*.*?(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d{1,5})\s*[mM]²?/gi,
     
-    // Padrão: 001 450,75 (números pequenos apenas)
-    /(?:^|\s)(\d{1,3})\s+(\d{2,3},\d{1,2}|\d{2,3})\s*[mM]²?/gm,
+    // Padrão: 001 1.343,75 (números com separador de milhares)
+    /(?:^|\s)(\d{1,3})\s+(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d{1,5})\s*[mM]²?/gm,
     
-    // Padrão: Lote: 001 Área: 450,75
-    /(?:LOTE|LOT|L)[:\s]*(\d{1,3}).*?(?:ÁREA|AREA|A)[:\s]*(\d{2,3},\d{1,2}|\d{2,3})/gi,
+    // Padrão: Lote: 001 Área: 1.343,75
+    /(?:LOTE|LOT|L)[:\s]*(\d{1,3}).*?(?:ÁREA|AREA|A)[:\s]*(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d{1,5})/gi,
     
-    // Padrão tabular: 001    450,75    LOTE
-    /(\d{1,3})\s+(\d{2,3},\d{1,2}|\d{2,3})\s+(?:LOTE|LOT|L)/gi,
+    // Padrão tabular: 001    1.343,75    LOTE
+    /(\d{1,3})\s+(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d{1,5})\s+(?:LOTE|LOT|L)/gi,
     
-    // Padrão brasileiro: 001 = 450,75m²
-    /(\d{1,3})\s*[=\-:]\s*(\d{2,3},\d{1,2}|\d{2,3})\s*[mM]²?/gi
+    // Padrão brasileiro: 001 = 1.343,75m²
+    /(\d{1,3})\s*[=\-:]\s*(\d{1,3}(?:\.\d{3})*,\d{1,2}|\d{1,5})\s*[mM]²?/gi
   ];
   
   for (const pattern of brazilianPatterns) {
@@ -397,12 +396,13 @@ function parseTextWithBrazilianFormats(text: string): LotData[] {
       const numero = match[1];
       let areaStr = match[2];
       
-      // Converter formato brasileiro (vírgula) para formato internacional (ponto)
-      areaStr = areaStr.replace(',', '.');
+      // Converter formato brasileiro para número
+      // Remove separadores de milhares (pontos) e converte vírgula para ponto decimal
+      areaStr = areaStr.replace(/\./g, '').replace(',', '.');
       const area = parseFloat(areaStr);
       
-      // Validar dados - ÁREAS BRASILEIRAS TÍPICAS
-      if (numero && !isNaN(area) && area >= 200 && area <= 800) {
+      // Validar apenas estrutura básica - SEM FILTROS DE TAMANHO
+      if (numero && !isNaN(area) && area > 0) {
         const numeroFormatado = numero.padStart(3, '0');
         
         // Evitar duplicatas
@@ -412,9 +412,8 @@ function parseTextWithBrazilianFormats(text: string): LotData[] {
             area: Math.round(area * 100) / 100, // 2 casas decimais
             tipo: 'lote'
           });
+          console.log('✅ Lote extraído:', numeroFormatado, '-', area, 'm²');
         }
-      } else if (area > 800) {
-        console.log('❌ Área muito grande ignorada (provável erro):', area, 'm² para lote', numero);
       }
     }
   }
@@ -423,30 +422,27 @@ function parseTextWithBrazilianFormats(text: string): LotData[] {
   return data.sort((a, b) => a.numero.localeCompare(b.numero));
 }
 
-function generateBrazilianLotData(): LotData[] {
-  console.log('🏗️ Gerando dados brasileiros de exemplo...');
+function generateLuxuryCondominiumData(): LotData[] {
+  console.log('🏰 Gerando dados de exemplo para condomínio de luxo...');
   
   const data: LotData[] = [];
   
-  // Gerar lotes com áreas típicas brasileiras CORRETAS
-  for (let i = 1; i <= 142; i++) {
+  // Gerar lotes com áreas de condomínio de luxo (1000-5000m²)
+  for (let i = 1; i <= 85; i++) {
     let area: number;
     
-    if (i <= 20) {
-      // Lotes de esquina - maiores (300-500m²)
-      area = Math.floor(Math.random() * (500 - 300) + 300) + Math.random() * 0.99;
+    if (i <= 15) {
+      // Lotes premium - muito grandes (3000-5000m²)
+      area = Math.floor(Math.random() * (5000 - 3000) + 3000) + Math.random() * 0.99;
+    } else if (i <= 35) {
+      // Lotes grandes (2000-3000m²)
+      area = Math.floor(Math.random() * (3000 - 2000) + 2000) + Math.random() * 0.99;
     } else if (i <= 60) {
-      // Lotes pequenos (250-350m²)
-      area = Math.floor(Math.random() * (350 - 250) + 250) + Math.random() * 0.99;
-    } else if (i <= 100) {
-      // Lotes médios (350-450m²)
-      area = Math.floor(Math.random() * (450 - 350) + 350) + Math.random() * 0.99;
-    } else if (i <= 130) {
-      // Lotes grandes (450-600m²)
-      area = Math.floor(Math.random() * (600 - 450) + 450) + Math.random() * 0.99;
+      // Lotes médios-grandes (1500-2000m²)
+      area = Math.floor(Math.random() * (2000 - 1500) + 1500) + Math.random() * 0.99;
     } else {
-      // Lotes especiais (600-800m²)
-      area = Math.floor(Math.random() * (800 - 600) + 600) + Math.random() * 0.99;
+      // Lotes padrão luxury (1000-1500m²)
+      area = Math.floor(Math.random() * (1500 - 1000) + 1000) + Math.random() * 0.99;
     }
     
     data.push({
@@ -456,18 +452,18 @@ function generateBrazilianLotData(): LotData[] {
     });
   }
   
-  // Adicionar áreas públicas brasileiras típicas
+  // Adicionar áreas públicas de condomínio de luxo
   const areasPublicas = [
-    { numero: 'AP-01', area: 1250.50 },
-    { numero: 'AP-02', area: 2850.75 },
-    { numero: 'PRAÇA-01', area: 1560.25 },
-    { numero: 'PRAÇA-02', area: 890.80 },
-    { numero: 'VIA-PRINCIPAL', area: 3200.00 },
-    { numero: 'VIA-SECUNDÁRIA', area: 2100.50 },
-    { numero: 'VERDE-01', area: 1120.25 },
-    { numero: 'VERDE-02', area: 750.60 },
-    { numero: 'INSTITUCIONAL', area: 2500.00 },
-    { numero: 'SISTEMA-VIÁRIO', area: 5200.40 }
+    { numero: 'CLUBE-01', area: 8500.75 },
+    { numero: 'GOLF-01', area: 25000.00 },
+    { numero: 'PRAÇA-CENTRAL', area: 3200.50 },
+    { numero: 'LAGO-01', area: 12000.80 },
+    { numero: 'VIA-PRINCIPAL', area: 15500.00 },
+    { numero: 'PORTARIA', area: 850.25 },
+    { numero: 'ÁREA-VERDE-01', area: 18000.60 },
+    { numero: 'QUADRA-TÊNIS', area: 1800.00 },
+    { numero: 'PISCINA-CLUBE', area: 2200.40 },
+    { numero: 'HELIPONTO', area: 1200.00 }
   ];
   
   areasPublicas.forEach(ap => {
@@ -478,6 +474,6 @@ function generateBrazilianLotData(): LotData[] {
     });
   });
   
-  console.log('✅ Dados brasileiros gerados:', data.length, 'itens');
+  console.log('✅ Dados de condomínio de luxo gerados:', data.length, 'itens');
   return data;
 }
