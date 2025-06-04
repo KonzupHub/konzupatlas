@@ -36,7 +36,11 @@ def process_pdf():
                 print(f"Processando página {i + 1}...")
                 
                 # OCR com Tesseract (português)
-                text = pytesseract.image_to_string(page, lang='por', config='--psm 6')
+               text6 = pytesseract.image_to_string(page, lang='por', config='--psm 6')
+               text11 = pytesseract.image_to_string(page, lang='por', config='--psm 11')
+               text4 = pytesseract.image_to_string(page, lang='por', config='--psm 4')
+               text = "\n".join([text6, text11, text4])
+
                 print(f"Texto extraído da página {i + 1}, tamanho: {len(text)}")
                 
                 # Extrair dados usando regex específicos para o padrão brasileiro
