@@ -38,7 +38,7 @@ export const usePDFProcessing = () => {
 
       const { filePath, historyId } = uploadResponse.data;
 
-      // Step 2: Processar com OCR
+      // Step 2: Processar com OCR REAL
       setCurrentStep('Convertendo PDF em imagens...');
       setProgress(30);
 
@@ -50,9 +50,9 @@ export const usePDFProcessing = () => {
         throw new Error(processResponse.error.message);
       }
 
-      // Simular progresso durante o processamento OCR
+      // Simular progresso durante o processamento OCR REAL
       const steps = [
-        { step: 'Executando OCR nas páginas...', progress: 50 },
+        { step: 'Executando OCR Tesseract...', progress: 50 },
         { step: 'Identificando padrões de lotes...', progress: 70 },
         { step: 'Extraindo números e áreas...', progress: 85 },
         { step: 'Organizando dados extraídos...', progress: 95 },
@@ -69,7 +69,7 @@ export const usePDFProcessing = () => {
 
       toast({
         title: "Processamento OCR concluído!",
-        description: `${totalItems} itens extraídos em ${processingTime}s via OCR. Arquivo temporário será removido automaticamente.`,
+        description: `${totalItems} itens extraídos em ${processingTime}s via OCR Tesseract. Arquivo temporário será removido automaticamente.`,
       });
 
       return extractedData;

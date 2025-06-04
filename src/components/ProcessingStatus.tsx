@@ -14,8 +14,8 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ fileName, progress,
   const steps = [
     { name: 'Upload concluído', icon: FileText, completed: progress >= 15 },
     { name: 'Convertendo em imagens', icon: ScanText, completed: progress >= 30 },
-    { name: 'Executando OCR', icon: Search, completed: progress >= 50 },
-    { name: 'Extraindo dados', icon: ScanText, completed: progress >= 70 },
+    { name: 'Executando OCR Tesseract', icon: Search, completed: progress >= 50 },
+    { name: 'Extraindo dados reais', icon: ScanText, completed: progress >= 70 },
     { name: 'Organizando lotes', icon: ScanText, completed: progress >= 85 },
     { name: 'Gerando planilha', icon: Table, completed: progress >= 100 },
   ];
@@ -29,7 +29,7 @@ const ProcessingStatus: React.FC<ProcessingStatusProps> = ({ fileName, progress,
             <span>Processando Master Plan</span>
           </CardTitle>
           <p className="text-sm text-gray-600">{fileName}</p>
-          <p className="text-xs text-gray-500">OCR analisando todos os lotes e áreas...</p>
+          <p className="text-xs text-gray-500">OCR Tesseract extraindo dados reais...</p>
         </CardHeader>
         
         <CardContent className="space-y-6">

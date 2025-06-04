@@ -84,7 +84,7 @@ const Index = () => {
               </h2>
               <p className="text-xl text-gray-600 max-w-2xl mx-auto">
                 Transforme mapas de loteamentos em planilhas organizadas em segundos. 
-                Precisão garantida com OCR avançado, trabalho manual eliminado.
+                Precisão garantida com OCR Tesseract, trabalho manual eliminado.
               </p>
             </div>
             
