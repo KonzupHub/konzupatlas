@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pdf2image
@@ -31,22 +30,21 @@ def process_pdf():
             print(f"PDF convertido em {len(pages)} páginas")
             
             extracted_data = []
-            
+
+            all_texts = []
             for i, page in enumerate(pages):
                 print(f"Processando página {i + 1}...")
-                
-                # OCR com Tesseract (português)
-               text6 = pytesseract.image_to_string(page, lang='por', config='--psm 6')
-               text11 = pytesseract.image_to_string(page, lang='por', config='--psm 11')
-               text4 = pytesseract.image_to_string(page, lang='por', config='--psm 4')
-               text = "\n".join([text6, text11, text4])
 
-                print(f"Texto extraído da página {i + 1}, tamanho: {len(text)}")
-                
-                # Extrair dados usando regex específicos para o padrão brasileiro
-                page_data = extract_lot_data(text, i + 1)
-                extracted_data.extend(page_data)
-            
+                # OCR com Tesseract (vários modos)
+                text6 = pytesseract.image_to_string(page, lang='por', config='--psm 6')
+                text11 = pytesseract.image_to_string(page, lang='por', config='--psm 11')
+                text4 = pytesseract.image_to_string(page, lang='por', config='--psm 4')
+                all_texts.extend([text6, text11, text4])
+
+            # Junta todos os textos OCR para análise única
+            all_lines = "\n".join(all_texts)
+            extracted_data = extract_lot_data(all_lines)
+
             # Limpar arquivo temporário
             os.unlink(tmp_file.name)
             
@@ -63,71 +61,50 @@ def process_pdf():
         print(f"Erro no processamento: {str(e)}")
         return jsonify({'error': f'Erro no processamento: {str(e)}'}), 500
 
-def extract_lot_data(text, page_num):
+def extract_lot_data(text):
     """
-    Extrai dados de lotes do texto usando padrões específicos do Brasil
-    Busca por padrões como: "1.343,10 m²", "Lote 01 - 1.570,55 m²", etc.
+    Extrai dados de lotes do texto usando padrões abrangentes para capturar todos os formatos.
     """
     data = []
-    
-    # Padrões para capturar áreas brasileiras EXATAS
-    patterns = [
-        # Padrão principal: "1.343,10 m²" ou "1343,10 m²"
-        r'(\d{1,4}(?:\.\d{3})*,\d{2})\s*m²',
-        
-        # Padrão com lote: "Lote 01 - 1.343,10 m²"
-        r'(?:lote|lot)\s*(\d+).*?(\d{1,4}(?:\.\d{3})*,\d{2})\s*m²',
-        
-        # Padrão tabular: "01    1.343,10 m²"
-        r'(\d{1,3})\s+(\d{1,4}(?:\.\d{3})*,\d{2})\s*m²',
-        
-        # Padrão com separador: "01 = 1.343,10 m²"
-        r'(\d{1,3})\s*[=\-:]\s*(\d{1,4}(?:\.\d{3})*,\d{2})\s*m²'
-    ]
-    
-    lote_counter = 1
-    found_areas = set()  # Para evitar duplicatas
-    
-    for pattern in patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        
-        for match in matches:
-            groups = match.groups()
-            
-            if len(groups) == 1:
-                # Só área encontrada
-                area_str = groups[0]
-                numero = f"{lote_counter:03d}"
-                lote_counter += 1
-            elif len(groups) == 2:
-                # Número e área encontrados
-                numero = f"{int(groups[0]):03d}"
-                area_str = groups[1]
+    found_areas = set()
+
+    # Analisa cada linha individualmente para maximizar a captura de lotes desalinhados
+    lines = text.split('\n')
+    for line in lines:
+        line = line.strip()
+        # 1. "Lote 012 - 1.234,56 m²"
+        match = re.match(r'(?:Lote|LOT|lot)?\s*(\d{1,4})[\s\-\–:]*([\d\.]{1,7},\d{2})\s*m²', line, re.IGNORECASE)
+        if match:
+            numero = match.group(1).zfill(3)
+            area_str = match.group(2)
+        else:
+            # 2. "012    1.234,56 m²"
+            match = re.match(r'(\d{1,4})\s+([\d\.]{1,7},\d{2})\s*m²', line)
+            if match:
+                numero = match.group(1).zfill(3)
+                area_str = match.group(2)
             else:
-                continue
-            
-            # Converter área brasileira para número
-            try:
-                # Remove pontos (separadores de milhares) e converte vírgula para ponto decimal
-                area_num = float(area_str.replace('.', '').replace(',', '.'))
-                
-                # Evitar duplicatas por área
-                if area_str not in found_areas and area_num > 0:
-                    found_areas.add(area_str)
-                    
-                    data.append({
-                        'numero': numero,
-                        'area': round(area_num, 2),
-                        'tipo': 'lote',
-                        'area_original': area_str,  # Manter formato original
-                        'page': page_num
-                    })
-                    
-                    print(f"✅ Extraído: Lote {numero} - {area_str} m² (página {page_num})")
-                    
-            except ValueError:
-                continue
-    
+                # 3. Só área: "1.234,56 m²"
+                match = re.match(r'([\d\.]{1,7},\d{2})\s*m²', line)
+                if match:
+                    numero = ""
+                    area_str = match.group(1)
+                else:
+                    continue
+
+        try:
+            area_num = float(area_str.replace('.', '').replace(',', '.'))
+            key = f"{numero}-{area_str}"
+            if key not in found_areas and area_num > 0:
+                found_areas.add(key)
+                data.append({
+                    'numero': numero if numero else f'{len(data)+1:03d}',
+                    'area': round(area_num, 2),
+                    'tipo': 'lote',
+                    'area_original': area_str
+                })
+        except Exception:
+            continue
     return data
 
 if __name__ == '__main__':
