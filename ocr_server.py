@@ -113,4 +113,6 @@ if __name__ == '__main__':
     print("Certifique-se de ter instalado:")
     print("pip install flask flask-cors pdf2image pytesseract pillow")
     print("E também instalar o Tesseract OCR no sistema")
+    print("🔥🔥🔥 CÓDIGO NOVO DA TÁTA RODOU ATÉ O FINAL!!! 🔥🔥🔥")
     app.run(host='0.0.0.0', port=5000, debug=True)
+
