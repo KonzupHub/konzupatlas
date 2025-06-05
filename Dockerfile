@@ -1,6 +1,6 @@
 FROM python:3.11
 
-RUN apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-por
+RUN apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-por poppler-utils
 
 WORKDIR /app
 COPY . .
