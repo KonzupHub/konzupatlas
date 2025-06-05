@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pdf2image
@@ -114,5 +113,10 @@ if __name__ == '__main__':
     print("pip install flask flask-cors pdf2image pytesseract pillow")
     print("E também instalar o Tesseract OCR no sistema")
     print("🔥🔥🔥 CÓDIGO NOVO DA TÁTA RODOU ATÉ O FINAL!!! 🔥🔥🔥")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # Configuração para produção
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    app.run(host='0.0.0.0', port=port, debug=debug)
 
